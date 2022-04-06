@@ -115,19 +115,16 @@ void fini()
 
 namespace
 {
-wf::output_t *current_output = NULL;
-uint32_t current_output_fb   = 0;
+uint32_t current_output_fb = 0;
 }
 
-void bind_output(wf::output_t *output, uint32_t fb)
+void bind_output(uint32_t fb)
 {
-    current_output    = output;
     current_output_fb = fb;
 }
 
-void unbind_output(wf::output_t *output)
+void unbind_output()
 {
-    current_output    = NULL;
     current_output_fb = 0;
 }
 

@@ -1,3 +1,4 @@
+#include "opengl-priv.hpp"
 #include "wayfire/output.hpp"
 #include "wayfire/core.hpp"
 #include "wayfire/output-layout.hpp"
@@ -248,6 +249,100 @@ inline bool is_shutting_down()
 {
     return wf::get_core().get_current_state() == compositor_state_t::SHUTDOWN;
 }
+
+class output_cloner_t
+{
+    wf::wl_listener_wrapper source_commit;
+    wf::wl_listener_wrapper destination_frame;
+    wf::framebuffer_base_t content;
+
+    wlr_output *source;
+    wlr_output *destination;
+
+  public:
+    output_cloner_t(wlr_output *source, wlr_output *destination)
+    {
+        this->source = source;
+        this->destination = destination;
+        wlr_output_lock_software_cursors(source, true);
+        wlr_output_schedule_frame(destination);
+
+        source_commit.set_callback([=] (void *data)
+        {
+            auto ev = (wlr_output_event_commit*)data;
+            if (!(ev->committed & WLR_OUTPUT_STATE_BUFFER))
+            {
+                // Something else than the output contents changed, nothing to do yet
+                return;
+            }
+
+            int w = ev->buffer->width;
+            int h = ev->buffer->height;
+
+            OpenGL::render_begin();
+            content.allocate(w, h);
+
+            // Bind buffer
+            auto renderer = get_core().renderer;
+            wlr_renderer_begin_with_buffer(renderer, ev->buffer);
+
+            // Store a copy for ourselves
+            GL_CALL(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, content.fb));
+            GL_CALL(glBlitFramebuffer(0, 0, w, h,
+                0, 0, w, h,
+                GL_COLOR_BUFFER_BIT, GL_LINEAR));
+
+            wlr_renderer_end(renderer);
+            OpenGL::render_end();
+
+            wlr_output_damage_whole(destination);
+            wlr_output_schedule_frame(destination);
+        });
+
+        destination_frame.set_callback([=] (void *data)
+        {
+            auto renderer = get_core().renderer;
+            wlr_output_attach_render(destination, NULL);
+            wlr_renderer_begin(renderer, destination->width, destination->height);
+
+            int w = content.viewport_width;
+            int h = content.viewport_height;
+            if ((w > 0) && (h > 0))
+            {
+                int current_fb;
+                GL_CALL(glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &current_fb));
+                OpenGL::bind_output(current_fb);
+
+                OpenGL::render_begin();
+                GL_CALL(glBindFramebuffer(GL_READ_FRAMEBUFFER, content.fb));
+                GL_CALL(glBlitFramebuffer(0, 0, w, h,
+                    0, 0, destination->width, destination->height,
+                    GL_COLOR_BUFFER_BIT, GL_LINEAR));
+
+                OpenGL::render_end();
+            }
+
+            wlr_renderer_end(renderer);
+            wlr_output_commit(destination);
+        });
+
+        source_commit.connect(&source->events.commit);
+        destination_frame.connect(&destination->events.frame);
+    }
+
+    ~output_cloner_t()
+    {
+        wlr_output_lock_software_cursors(source, false);
+        OpenGL::render_begin();
+        content.release();
+        OpenGL::render_end();
+    }
+
+    output_cloner_t(const output_cloner_t&) = delete;
+    output_cloner_t(output_cloner_t&&) = delete;
+    output_cloner_t& operator =(const output_cloner_t&) = delete;
+    output_cloner_t& operator =(output_cloner_t&&) = delete;
+};
 
 /** Represents a single output in the output layout */
 struct output_layout_output_t
@@ -589,64 +684,6 @@ struct output_layout_output_t
         wlr_output_commit(handle);
     }
 
-    /* Mirroring implementation */
-    wl_listener_wrapper on_mirrored_frame;
-    wl_listener_wrapper on_frame;
-    wlr_output *locked_cursors_on = NULL;
-
-    /** Render the output using texture as source */
-    void render_output(wlr_texture *texture)
-    {
-        auto renderer = get_core().renderer;
-        wlr_output_attach_render(handle, NULL);
-        wlr_renderer_begin(renderer, handle->width, handle->height);
-
-        wf::texture_t tex{texture};
-        OpenGL::render_transformed_texture(tex, {-1, -1, 2, 2});
-
-        wlr_renderer_end(renderer);
-        wlr_output_commit(handle);
-    }
-
-    /* Load output contents and render them */
-    wlr_buffer *source_back_buffer = NULL;
-
-    void handle_frame()
-    {
-        auto wo = get_core().output_layout->find_output(
-            current_state.mirror_from);
-        if (!wo)
-        {
-            LOGE("Cannot find mirrored output ", current_state.mirror_from,
-                " for output ", handle->name);
-
-            return;
-        }
-
-        wlr_dmabuf_attributes attributes;
-        if (source_back_buffer == NULL)
-        {
-            LOGE("Got empty buffer on ", wo->handle->name);
-            return;
-        }
-
-        if (!wlr_buffer_get_dmabuf(source_back_buffer, &attributes))
-        {
-            LOGE("Failed reading mirrored output contents from ", wo->handle->name);
-
-            return;
-        }
-
-        /* We export the output to mirror from to a dmabuf, then create
-         * a texture from this and use it to render "our" output */
-        auto texture = wlr_texture_from_dmabuf(
-            get_core().renderer, &attributes);
-        render_output(texture);
-
-        wlr_texture_destroy(texture);
-        wlr_dmabuf_attributes_finish(&attributes);
-    }
-
     void set_enabled(bool enabled)
     {
         wlr_output_enable(handle, enabled);
@@ -656,6 +693,7 @@ struct output_layout_output_t
         }
     }
 
+    std::unique_ptr<output_cloner_t> cloner;
     void setup_mirror()
     {
         /* Check if we can mirror */
@@ -686,55 +724,12 @@ struct output_layout_output_t
             return;
         }
 
-        /* Force software cursors on the mirrored from output.
-         * This ensures that they will be copied when reading pixels
-         * from the main plane */
-        wlr_output_lock_software_cursors(wo->handle, true);
-        locked_cursors_on = wo->handle;
-
-        wlr_output_schedule_frame(handle);
-        on_mirrored_frame.set_callback([=] (void *data)
-        {
-            auto ev = (wlr_output_event_commit*)data;
-
-            if (ev->buffer)
-            {
-                if (source_back_buffer)
-                {
-                    wlr_buffer_unlock(source_back_buffer);
-                }
-
-                source_back_buffer = ev->buffer;
-                wlr_buffer_lock(ev->buffer);
-            }
-
-            /* The mirrored output was repainted, schedule repaint
-             * for us as well */
-            wlr_output_damage_whole(handle);
-            wlr_output_schedule_frame(handle);
-        });
-        on_mirrored_frame.connect(&wo->handle->events.commit);
-
-        on_frame.set_callback([=] (void*) { handle_frame(); });
-        on_frame.connect(&handle->events.frame);
+        cloner = std::make_unique<output_cloner_t>(wo->handle, this->handle);
     }
 
     void teardown_mirror()
     {
-        if (locked_cursors_on)
-        {
-            wlr_output_lock_software_cursors(locked_cursors_on, false);
-            locked_cursors_on = NULL;
-        }
-
-        if (source_back_buffer)
-        {
-            wlr_buffer_unlock(source_back_buffer);
-            source_back_buffer = NULL;
-        }
-
-        on_mirrored_frame.disconnect();
-        on_frame.disconnect();
+        cloner.reset();
     }
 
     wf::dimensions_t get_effective_size()

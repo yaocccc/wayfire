@@ -793,7 +793,7 @@ class wf::render_manager::impl
      */
     void bind_output(uint32_t fb)
     {
-        OpenGL::bind_output(output, fb);
+        OpenGL::bind_output(fb);
 
         /* Make sure the default buffer has enough size */
         postprocessing->allocate(output->handle->width, output->handle->height);
@@ -845,7 +845,8 @@ class wf::render_manager::impl
             !output_inhibit_counter &&
             !renderer &&
             effects->can_scanout() &&
-            postprocessing->can_scanout();
+            postprocessing->can_scanout() &&
+            output->handle->software_cursor_locks == 0;
 
         if (!can_scanout)
         {
@@ -1041,7 +1042,7 @@ class wf::render_manager::impl
         OpenGL::render_end();
 
         /* Part 6: finalize frame: swap buffers, send frame_done, etc */
-        OpenGL::unbind_output(output);
+        OpenGL::unbind_output();
         output_damage->swap_buffers(swap_damage);
         swap_damage.clear();
         post_paint();
