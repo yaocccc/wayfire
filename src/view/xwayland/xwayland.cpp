@@ -88,62 +88,60 @@ class toplevel_view_t : public view_base_t
     {
         /* Some X clients position themselves on map, and others let the window
          * manager determine this. We try to heuristically guess which of the
-        bool client_self_positioned = self_positioned;
-        emit_view_map_signal(self(), client_self_positioned);
+         *  bool client_self_positioned = self_positioned;
+         *  emit_view_map_signal(self(), client_self_positioned);
+         *  }
+         *
+         *  void map() override
+         *  {
+         *  if (xw->maximized_horz && xw->maximized_vert)
+         *  {
+         *   if ((xw->width > 0) && (xw->height > 0))
+         *   {
+         *       /* Save geometry which the window has put itself in */
+        wf::geometry_t save_geometry = {
+            xw->x, xw->y, xw->width, xw->height
+        };
+
+        /* Make sure geometry is properly visible on the view output */
+        save_geometry = wf::clamp(save_geometry,
+            get_output()->workspace->get_workarea());
+        view_impl->update_windowed_geometry(self(), save_geometry);
     }
 
-    void map() override
+    tile_request(wf::TILED_EDGES_ALL);
+}
+
+if (xw->fullscreen)
+{
+    fullscreen_request(get_output(), true);
+}
+
+if (!this->tiled_edges && !xw->fullscreen)
+{
+    configure_request({xw->x, xw->y, xw->width, xw->height});
+}
+
+wf::wlr_view_t::map();
+}
+
+void commit() override
+{
+    if (!xw->has_alpha)
     {
-        if (xw->maximized_horz && xw->maximized_vert)
-        {
-            if ((xw->width > 0) && (xw->height > 0))
-            {
-                /* Save geometry which the window has put itself in */
-                wf::geometry_t save_geometry = {
-                    xw->x, xw->y, xw->width, xw->height
-                };
-
-                /* Make sure geometry is properly visible on the view output */
-                save_geometry = wf::clamp(save_geometry,
-                    get_output()->workspace->get_workarea());
-                view_impl->update_windowed_geometry(self(), save_geometry);
-            }
-
-            tile_request(wf::TILED_EDGES_ALL);
-        }
-
-        if (xw->fullscreen)
-        {
-            fullscreen_request(get_output(), true);
-        }
-
-        if (!this->tiled_edges && !xw->fullscreen)
-        {
-            configure_request({xw->x, xw->y, xw->width, xw->height});
-        }
-
-        wf::wlr_view_t::map();
+        pixman_region32_union_rect(
+            &xw->surface->opaque_region, &xw->surface->opaque_region,
+            0, 0, xw->surface->current.width, xw->surface->current.height);
     }
 
-    void commit() override
-    {
-        if (!xw->has_alpha)
-        {
-            pixman_region32_union_rect(
-                &xw->surface->opaque_region, &xw->surface->opaque_region,
-                0, 0, xw->surface->current.width, xw->surface->current.height);
-        }
+    wf::wlr_view_t::commit();
+}
 
-        wf::wlr_view_t::commit();
-    }
-
-    xwayland_view_type_t get_current_impl_type() const override
-    {
-        return xwayland_view_type_t::NORMAL;
-    }
-};
-
-
+xwayland_view_type_t get_current_impl_type() const override
+{
+    return xwayland_view_type_t::NORMAL;
+}
+}
 }
 }
 
@@ -241,7 +239,7 @@ class wayfire_xwayland_view_base : public wf::wlr_view_t
         wf::geometry_t g)
     {
         auto outputs = wf::get_core().output_layout->get_outputs();
-        auto og   = output->get_layout_geometry();
+        auto og = output->get_layout_geometry();
         auto from = wf::get_core().output_layout->get_output_at(
             g.x + g.width / 2 + og.x, g.y + g.height / 2 + og.y);
         if (!from)
@@ -587,7 +585,7 @@ void wayfire_xwayland_view_base::recreate_view()
      * Copy xw and mapped status into the stack, because "this" may be destroyed
      * at some point of this function.
      */
-    auto xw_surf    = this->xw;
+    auto xw_surf = this->xw;
     bool was_mapped = is_mapped();
 
     // destroy the view (unmap + destroy)
@@ -690,7 +688,7 @@ void wf::xwayland_update_default_cursor()
         return;
     }
 
-    auto xc     = wf::get_core_impl().seat->cursor->xcursor;
+    auto xc = wf::get_core_impl().seat->cursor->xcursor;
     auto cursor = wlr_xcursor_manager_get_xcursor(xc, "left_ptr", 1);
     if (cursor && (cursor->image_count > 0))
     {

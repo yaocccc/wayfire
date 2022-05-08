@@ -59,7 +59,7 @@ wf::xwayland_toplevel_t::xwayland_toplevel_t(
         if (!this->_current.activated)
         {
             wf::toplevel_focus_request_signal data;
-            data.toplevel = {this};
+            data.toplevel     = {this};
             data.self_request = true;
             emit_signal("toplevel-focus-request", &data);
             wf::get_core().emit_signal("view-focus-request", &data);
