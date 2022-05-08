@@ -450,7 +450,7 @@ struct app_id_changed_signal : public wf::signal_data_t
  * -------------------------------------------------------------------------- */
 /**
  * name: toplevel-move-request
- * on: output
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: Whenever an interactive move is requested on the toplevel. See also
  *   toplevel_emit_move_request()
  */
@@ -461,7 +461,7 @@ struct toplevel_move_request_signal : public wf::signal_data_t
 
 /**
  * name: toplevel-resize-request
- * on: output
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: Whenever an interactive resize is requested on the toplevel. See also
  *   toplevel_emit_resize_request
  */
@@ -475,7 +475,7 @@ struct toplevel_resize_request_signal : public wf::signal_data_t
 
 /**
  * name: minimized
- * on: toplevel, output(toplevel-)
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: After the toplevel's minimized state changes.
  */
 struct toplevel_minimized_signal : public wf::signal_data_t
@@ -488,7 +488,7 @@ struct toplevel_minimized_signal : public wf::signal_data_t
 
 /**
  * name: toplevel-minimize-request
- * on: output
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: Emitted whenever some entity requests that the toplevels's minimized
  *   state changes. See also toplevel_emit_minimize_request()
  */
@@ -508,7 +508,7 @@ struct toplevel_minimize_request_signal : public wf::signal_data_t
 
 /**
  * name: tiled
- * on: view, output(toplevel-)
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: After the toplevel's tiled edges change.
  */
 struct toplevel_tiled_signal : public wf::signal_data_t
@@ -523,7 +523,7 @@ struct toplevel_tiled_signal : public wf::signal_data_t
 
 /**
  * name: toplevel-tile-request
- * on: output
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: Emitted whenever some entity requests that the toplevel's tiled edges
  *   change. See also toplevel_emit_tile_request().
  */
@@ -555,7 +555,7 @@ struct toplevel_tile_request_signal : public wf::signal_data_t
 
 /**
  * name: fullscreen
- * on: toplevel, output(toplevel-)
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: After the toplevel's fullscreen state changes.
  */
 struct toplevel_fullscreen_signal : public wf::signal_data_t
@@ -568,7 +568,7 @@ struct toplevel_fullscreen_signal : public wf::signal_data_t
 
 /**
  * name: toplevel-fullscreen-request
- * on: output
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: Emitted whenever some entity requests that the toplevels's fullscreen
  *   state change. See also toplevel_emit_fullscreen_request()
  */
@@ -600,7 +600,7 @@ struct toplevel_fullscreen_request_signal : public wf::signal_data_t
 
 /**
  * name: geometry-changed
- * on: toplevel, output(toplevel-)
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: Whenever the toplevel's geometry changes.
  */
 struct toplevel_geometry_changed_signal : public wf::signal_data_t
@@ -626,7 +626,7 @@ struct toplevel_output_changed_signal : public wf::signal_data_t
 
 /**
  * name: decoration-state-updated
- * on: toplevel, output(toplevel-)
+ * on: toplevel, output(toplevel-), core(toplevel-)
  * when: Whenever the value of toplevel::should_be_decorated() changes.
  */
 struct toplevel_decoration_state_updated_signal : public wf::signal_data_t
@@ -635,12 +635,38 @@ struct toplevel_decoration_state_updated_signal : public wf::signal_data_t
 };
 
 /**
+ * name: focus-request
+ * on: toplevel, output(toplevel-), core(toplevel-)
+ * when: Emitted whenever some entity (typically a panel) wants to focus a toplevel.
+ */
+struct toplevel_focus_request_signal : public wf::signal_data_t
+{
+    wf::optr<wf::toplevel_t> toplevel;
+
+    /** Set to true if core and other plugins should not handle this request. */
+    bool carried_out = false;
+
+    /** Set to true if the request comes from the toplevel itself */
+    bool self_request;
+};
+
+/**
+ * name: hints-changed
+ * on: toplevel, output(toplevel-), core(toplevel-)
+ * when: the client indicates the views hints have changed (example urgency hint).
+ */
+struct toplevel_hints_changed_signal : public wf::signal_data_t
+{
+    wf::optr<wf::toplevel_t> toplevel;
+    bool demands_attention = false;
+};
+
+/**
  * name: decoration-changed
  * on: toplevel
  * when: Whenever the toplevel's decoration changes.
  * argument: unused.
  */
-
 
 /* ----------------------------------------------------------------------------/
  * View state signals
@@ -657,20 +683,6 @@ struct view_bbox_changed_signal : public wf::signal_data_t
     wayfire_view view;
 
     wf::geometry_t old_bbox;
-};
-
-/**
- * name: view-focus-request
- * on: view, core
- * when: Emitted whenever some entity (typically a panel) wants to focus the view.
- */
-struct view_focus_request_signal : public _view_signal
-{
-    /** Set to true if core and other plugins should not handle this request. */
-    bool carried_out = false;
-
-    /** Set to true if the request comes from the view client itself */
-    bool self_request;
 };
 
 /**
@@ -807,16 +819,6 @@ using view_disappeared_signal = _view_signal;
  * argument: The newly focused view.
  */
 using focus_view_signal = _view_signal;
-
-/**
- * name: hints-changed
- * on: view and core(view-)
- * when: the client indicates the views hints have changed (example urgency hint).
- */
-struct view_hints_changed_signal : public _view_signal
-{
-    bool demands_attention = false;
-};
 
 /**
  * name: view-system-bell

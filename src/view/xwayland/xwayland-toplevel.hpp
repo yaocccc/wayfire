@@ -28,11 +28,13 @@ class xwayland_toplevel_t : public wf::toplevel_t
     wf::wl_listener_wrapper on_destroy;
     wf::wl_listener_wrapper on_request_move;
     wf::wl_listener_wrapper on_request_resize;
+    wf::wl_listener_wrapper on_request_activate;
     wf::wl_listener_wrapper on_request_minimize;
     wf::wl_listener_wrapper on_request_maximize;
     wf::wl_listener_wrapper on_request_fullscreen;
     wf::wl_listener_wrapper on_configure;
 
+    wf::wl_listener_wrapper on_set_hints;
     wf::wl_listener_wrapper on_set_decorations;
 
     void handle_configure_request(wlr_xwayland_surface_configure_event *ev);

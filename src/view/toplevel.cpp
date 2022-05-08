@@ -254,6 +254,8 @@ void wf::emit_toplevel_signal(wf::toplevel_t *toplevel,
         toplevel->current().primary_output->emit_signal(
             "toplevel-" + std::string(signal_name), data);
     }
+
+    wf::get_core().emit_signal("toplevel-" + std::string(signal_name), data);
 }
 
 void wf::view_interface_t::focus_request()

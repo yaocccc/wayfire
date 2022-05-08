@@ -16,6 +16,139 @@
 
 #if WF_HAS_XWAYLAND
 
+namespace wf
+{
+namespace xw
+{
+class view_base_t : public wlr_view_t
+{
+  public:
+    virtual window_type_t get_current_type() = 0;
+};
+
+/**
+ * Check whether the view's classification is different than its current
+ * implementation type.
+ * If yes, the view is destroyed and a new view is created with the correct
+ * implementation type.
+ */
+bool check_recreate_view(view_base_t *base, wlr_xwayland_surface *xw);
+
+class toplevel_view_t : public view_base_t
+{
+    wf::wl_listener_wrapper on_set_parent;
+    wf::wl_listener_wrapper on_set_hints;
+    wlr_xwayland_surface *xw;
+
+  public:
+    toplevel_view_t(wlr_xwayland_surface *xww) : view_base_t()
+    {
+        on_set_parent.set_callback([&] (void*)
+        {
+            /* Menus, etc. with TRANSIENT_FOR but not dialogs */
+            if (check_recreate_view(this, this->xw))
+            {
+                return;
+            }
+
+            auto parent = xw->parent ?
+                static_cast<wf::view_interface_t*>(xw->parent->data)->self() : nullptr;
+
+            // Make sure the parent is mapped, and that we are not a toplevel view
+            if (parent &&
+                (!parent->is_mapped() ||
+                 xwayland_surface_has_type(xw, _NET_WM_WINDOW_TYPE_NORMAL)))
+            {
+                parent = nullptr;
+            }
+
+            set_toplevel_parent(parent);
+        });
+
+        on_set_parent.connect(&xw->events.set_parent);
+
+        xw->data = dynamic_cast<wf::view_interface_t*>(this);
+        // set initial parent
+        on_set_parent.emit(nullptr);
+    }
+
+    virtual void initialize() override
+    {
+        wayfire_xwayland_view_base::initialize();
+    }
+
+    virtual void destroy() override
+    {
+        on_set_parent.disconnect();
+
+        wayfire_xwayland_view_base::destroy();
+    }
+
+    void emit_map() override
+    {
+        /* Some X clients position themselves on map, and others let the window
+         * manager determine this. We try to heuristically guess which of the
+        bool client_self_positioned = self_positioned;
+        emit_view_map_signal(self(), client_self_positioned);
+    }
+
+    void map() override
+    {
+        if (xw->maximized_horz && xw->maximized_vert)
+        {
+            if ((xw->width > 0) && (xw->height > 0))
+            {
+                /* Save geometry which the window has put itself in */
+                wf::geometry_t save_geometry = {
+                    xw->x, xw->y, xw->width, xw->height
+                };
+
+                /* Make sure geometry is properly visible on the view output */
+                save_geometry = wf::clamp(save_geometry,
+                    get_output()->workspace->get_workarea());
+                view_impl->update_windowed_geometry(self(), save_geometry);
+            }
+
+            tile_request(wf::TILED_EDGES_ALL);
+        }
+
+        if (xw->fullscreen)
+        {
+            fullscreen_request(get_output(), true);
+        }
+
+        if (!this->tiled_edges && !xw->fullscreen)
+        {
+            configure_request({xw->x, xw->y, xw->width, xw->height});
+        }
+
+        wf::wlr_view_t::map();
+    }
+
+    void commit() override
+    {
+        if (!xw->has_alpha)
+        {
+            pixman_region32_union_rect(
+                &xw->surface->opaque_region, &xw->surface->opaque_region,
+                0, 0, xw->surface->current.width, xw->surface->current.height);
+        }
+
+        wf::wlr_view_t::commit();
+    }
+
+    xwayland_view_type_t get_current_impl_type() const override
+    {
+        return xwayland_view_type_t::NORMAL;
+    }
+};
+
+
+}
+}
+
+
+
 class wayfire_xwayland_view_base : public wf::wlr_view_t
 {
   protected:
@@ -85,12 +218,6 @@ class wayfire_xwayland_view_base : public wf::wlr_view_t
         on_set_window_type.disconnect();
 
         wf::wlr_view_t::destroy();
-    }
-
-    virtual bool should_be_decorated() override
-    {
-        return (wf::wlr_view_t::should_be_decorated() &&
-            !has_type(_NET_WM_WINDOW_TYPE_SPLASH));
     }
 
     /* Translates geometry from X client configure requests to wayfire
@@ -209,150 +336,6 @@ class wayfire_xwayland_view_base : public wf::wlr_view_t
         {
             send_configure();
         }
-    }
-};
-
-class wayfire_xwayland_view : public wayfire_xwayland_view_base
-{
-    wf::wl_listener_wrapper on_request_move, on_request_resize,
-        on_request_maximize, on_request_minimize, on_request_activate,
-        on_request_fullscreen, on_set_parent, on_set_hints;
-
-  public:
-    wayfire_xwayland_view(wlr_xwayland_surface *xww) :
-        wayfire_xwayland_view_base(xww)
-    {}
-
-    virtual void initialize() override
-    {
-        LOGE("new xwayland surface ", xw->title,
-            " class: ", xw->class_t, " instance: ", xw->instance);
-        wayfire_xwayland_view_base::initialize();
-        on_request_activate.set_callback([&] (void*)
-        {
-            if (!this->_current.activated)
-            {
-                wf::view_focus_request_signal data;
-                data.view = self();
-                data.self_request = true;
-                emit_signal("view-focus-request", &data);
-                wf::get_core().emit_signal("view-focus-request", &data);
-            }
-        });
-
-        on_set_parent.set_callback([&] (void*)
-        {
-            /* Menus, etc. with TRANSIENT_FOR but not dialogs */
-            if (is_unmanaged())
-            {
-                recreate_view();
-
-                return;
-            }
-
-            auto parent = xw->parent ?
-                static_cast<wf::view_interface_t*>(xw->parent->data)->self() : nullptr;
-
-            // Make sure the parent is mapped, and that we are not a toplevel view
-            if (parent)
-            {
-                if (!parent->is_mapped() ||
-                    this->has_type(_NET_WM_WINDOW_TYPE_NORMAL))
-                {
-                    parent = nullptr;
-                }
-            }
-
-            set_toplevel_parent(parent);
-        });
-
-        on_set_hints.set_callback([&] (void*)
-        {
-            wf::view_hints_changed_signal data;
-            data.view = this;
-            if (xw->hints_urgency)
-            {
-                data.demands_attention = true;
-            }
-
-            wf::get_core().emit_signal("view-hints-changed", &data);
-            this->emit_signal("hints-changed", &data);
-        });
-        on_set_parent.connect(&xw->events.set_parent);
-        on_set_hints.connect(&xw->events.set_hints);
-
-        xw->data = dynamic_cast<wf::view_interface_t*>(this);
-        // set initial parent
-        on_set_parent.emit(nullptr);
-    }
-
-    virtual void destroy() override
-    {
-        on_set_parent.disconnect();
-        on_set_hints.disconnect();
-        on_request_activate.disconnect();
-
-        wayfire_xwayland_view_base::destroy();
-    }
-
-    void emit_map() override
-    {
-        /* Some X clients position themselves on map, and others let the window
-         * manager determine this. We try to heuristically guess which of the
-         * two cases we're dealing with by checking whether we have received
-         * a valid ConfigureRequest before mapping */
-        bool client_self_positioned = self_positioned;
-        emit_view_map_signal(self(), client_self_positioned);
-    }
-
-    void map() override
-    {
-        if (xw->maximized_horz && xw->maximized_vert)
-        {
-            if ((xw->width > 0) && (xw->height > 0))
-            {
-                /* Save geometry which the window has put itself in */
-                wf::geometry_t save_geometry = {
-                    xw->x, xw->y, xw->width, xw->height
-                };
-
-                /* Make sure geometry is properly visible on the view output */
-                save_geometry = wf::clamp(save_geometry,
-                    get_output()->workspace->get_workarea());
-                view_impl->update_windowed_geometry(self(), save_geometry);
-            }
-
-            tile_request(wf::TILED_EDGES_ALL);
-        }
-
-        if (xw->fullscreen)
-        {
-            fullscreen_request(get_output(), true);
-        }
-
-        if (!this->tiled_edges && !xw->fullscreen)
-        {
-            configure_request({xw->x, xw->y, xw->width, xw->height});
-        }
-
-        wf::wlr_view_t::map();
-    }
-
-    void commit() override
-    {
-        if (!xw->has_alpha)
-        {
-            pixman_region32_union_rect(
-                &xw->surface->opaque_region, &xw->surface->opaque_region,
-                0, 0, xw->surface->current.width, xw->surface->current.height);
-        }
-
-        wf::wlr_view_t::commit();
-    }
-
-    xwayland_view_type_t get_current_impl_type() const override
-    {
-        return xwayland_view_type_t::NORMAL;
     }
 };
 

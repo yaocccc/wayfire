@@ -54,15 +54,41 @@ wf::xwayland_toplevel_t::xwayland_toplevel_t(
         auto ev = (wlr_xwayland_minimize_event*)data;
         wf::toplevel_emit_minimize_request({this}, ev->minimize);
     });
+    on_request_activate.set_callback([&] (void*)
+    {
+        if (!this->_current.activated)
+        {
+            wf::toplevel_focus_request_signal data;
+            data.toplevel = {this};
+            data.self_request = true;
+            emit_signal("toplevel-focus-request", &data);
+            wf::get_core().emit_signal("view-focus-request", &data);
+        }
+    });
+    on_set_hints.set_callback([&] (void*)
+    {
+        wf::toplevel_hints_changed_signal data;
+        data.toplevel = {this};
+        if (xw->hints_urgency)
+        {
+            data.demands_attention = true;
+        }
+
+        wf::get_core().emit_signal("view-hints-changed", &data);
+        this->emit_signal("hints-changed", &data);
+    });
 
     on_commit.connect(&xw->surface->events.commit);
     on_destroy.connect(&xw->events.destroy);
     on_set_decorations.connect(&xw->events.set_decorations);
     on_set_decorations.emit(NULL);
 
+    on_set_hints.connect(&xw->events.set_hints);
+
     on_configure.connect(&xw->events.request_configure);
     on_request_move.connect(&xw->events.request_move);
     on_request_resize.connect(&xw->events.request_resize);
+    on_request_activate.connect(&xw->events.request_activate);
     on_request_maximize.connect(&xw->events.request_maximize);
     on_request_minimize.connect(&xw->events.request_minimize);
     on_request_fullscreen.connect(&xw->events.request_fullscreen);
@@ -81,11 +107,13 @@ void wf::xwayland_toplevel_t::destroy()
     this->xw = NULL;
     on_commit.disconnect();
     on_destroy.disconnect();
+    on_set_hints.disconnect();
     on_set_decorations.disconnect();
 
     on_configure.disconnect();
     on_request_move.disconnect();
     on_request_resize.disconnect();
+    on_request_activate.disconnect();
     on_request_maximize.disconnect();
     on_request_minimize.disconnect();
     on_request_fullscreen.disconnect();

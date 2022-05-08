@@ -7,6 +7,8 @@ wf::xwayland_desktop_surface_t::xwayland_desktop_surface_t(
     wlr_xwayland_surface *xw) : wlr_desktop_surface_t(xw->surface)
 {
     this->xw = xw;
+    LOGE("new xwayland surface ", xw->title,
+        " class: ", xw->class_t, " instance: ", xw->instance);
 
     on_destroy.set_callback([&] (void*)
     {
