@@ -20,7 +20,7 @@ namespace wf
 {
 namespace xw
 {
-class view_base_t : public wlr_view_t
+class view_base_t : public wf::wlr_view_t
 {
   public:
     virtual window_type_t get_current_type() = 0;
@@ -72,16 +72,10 @@ class toplevel_view_t : public view_base_t
         on_set_parent.emit(nullptr);
     }
 
-    virtual void initialize() override
-    {
-        wayfire_xwayland_view_base::initialize();
-    }
-
     virtual void destroy() override
     {
         on_set_parent.disconnect();
-
-        wayfire_xwayland_view_base::destroy();
+        view_base_t::destroy();
     }
 
     void emit_map() override
@@ -109,9 +103,9 @@ class toplevel_view_t : public view_base_t
         view_impl->update_windowed_geometry(self(), save_geometry);
     }
 
-    tile_request(wf::TILED_EDGES_ALL);
-}
+};
 
+    tile_request(wf::TILED_EDGES_ALL);
 if (xw->fullscreen)
 {
     fullscreen_request(get_output(), true);
