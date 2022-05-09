@@ -102,10 +102,9 @@ class toplevel_view_t : public view_base_t
             get_output()->workspace->get_workarea());
         view_impl->update_windowed_geometry(self(), save_geometry);
     }
-
 };
 
-    tile_request(wf::TILED_EDGES_ALL);
+tile_request(wf::TILED_EDGES_ALL);
 if (xw->fullscreen)
 {
     fullscreen_request(get_output(), true);
