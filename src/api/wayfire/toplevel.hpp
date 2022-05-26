@@ -118,7 +118,10 @@ class toplevel_t : public wf::object_base_t
 
     // Forward compatibility: the pending state of the toplevel once transactions
     // are here.
-    virtual toplevel_state_t& pending() { return current(); }
+    virtual toplevel_state_t& pending()
+    {
+        return current();
+    }
 
     /** Set the minimized state of the toplevel. */
     virtual void set_minimized(bool minimized) = 0;

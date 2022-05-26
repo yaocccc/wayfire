@@ -78,7 +78,6 @@ class layer_desktop_surface_t : public wlr_desktop_surface_t
         }
     }
 };
-
 }
 }
 

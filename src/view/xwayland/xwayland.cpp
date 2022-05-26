@@ -23,7 +23,6 @@ namespace wf
 {
 namespace xw
 {
-
 /**
  * A surface_interface_t implementation for Xwayland-based surfaces.
  * Based on the default wlr_surface surface_interface_t implementation,
@@ -35,8 +34,8 @@ class xwayland_surface_t : public wlr_surface_base_t
     wlr_xwayland_surface *xw;
 
   public:
-    xwayland_surface_t(wlr_xwayland_surface *xw)
-        : wlr_surface_base_t(xw->surface), xw(xw)
+    xwayland_surface_t(wlr_xwayland_surface *xw) :
+        wlr_surface_base_t(xw->surface), xw(xw)
     {
         on_destroy.set_callback([=] (void*)
         {
@@ -134,7 +133,7 @@ wf::geometry_t configure_request(wf::wlr_view_t *view,
     configure_geometry.y -= og.y;
 
     auto parent = wf::find_toplevel_parent({view});
-    auto vg = parent->get_untransformed_bounding_box();
+    auto vg     = parent->get_untransformed_bounding_box();
 
     // View workspace relative to current workspace
     wf::point_t view_ws = {0, 0};
@@ -202,7 +201,8 @@ class xwayland_toplevel_view_t : public wlr_view_t
 
             // Make sure the parent is mapped, and that we are not a toplevel view
             if (parent && (!parent->is_mapped() ||
-                    xwayland_surface_has_type(xw, _NET_WM_WINDOW_TYPE_NORMAL)))
+                           xwayland_surface_has_type(xw,
+                               _NET_WM_WINDOW_TYPE_NORMAL)))
             {
                 parent = nullptr;
             }
@@ -238,7 +238,8 @@ class xwayland_toplevel_view_t : public wlr_view_t
                 save_geometry = wf::clamp(save_geometry,
                     get_output()->workspace->get_workarea());
 
-                auto tsg = view_impl->toplevel->get_data_safe<toplevel_saved_geometry_t>();
+                auto tsg =
+                    view_impl->toplevel->get_data_safe<toplevel_saved_geometry_t>();
                 // FIXME: is this the best way to do this?
                 tsg->last_windowed_geometry = save_geometry;
             }
@@ -253,7 +254,8 @@ class xwayland_toplevel_view_t : public wlr_view_t
 
         if (!topl()->current().tiled_edges && !topl()->current().fullscreen)
         {
-            auto client_wants = configure_request(this, get_output()->workspace->get_workarea(),
+            auto client_wants = configure_request(this,
+                get_output()->workspace->get_workarea(),
                 {xw->x, xw->y, xw->width, xw->height});
             topl()->set_geometry(client_wants);
         }
@@ -277,14 +279,15 @@ class xwayland_or_view_t : public wf::wlr_view_t
     wf::wl_listener_wrapper on_configure;
     wf::wl_listener_wrapper on_set_geometry;
 
-    wf::signal_connection_t my_output_changed = [&] (wf::signal_data_t *)
+    wf::signal_connection_t my_output_changed = [&] (wf::signal_data_t*)
     {
         my_output_geometry_changed.disconnect();
         workspace_changed.disconnect();
 
         if (get_output())
         {
-            get_output()->connect_signal("output-configuration-changed", &my_output_geometry_changed);
+            get_output()->connect_signal("output-configuration-changed",
+                &my_output_geometry_changed);
             get_output()->connect_signal("workspace-changed", &workspace_changed);
         }
 
@@ -302,7 +305,7 @@ class xwayland_or_view_t : public wf::wlr_view_t
         // Because of this, they cannot be moved by workspace manager when the
         // current workspace changes. Instead, we listen for workspace changed
         // and adjust our internal position.
-        auto ev = static_cast<wf::workspace_changed_signal*>(data);
+        auto ev    = static_cast<wf::workspace_changed_signal*>(data);
         auto delta = ev->old_viewport - ev->new_viewport;
         if (get_output())
         {
@@ -324,7 +327,7 @@ class xwayland_or_view_t : public wf::wlr_view_t
             return;
         }
 
-        if (width <= 0 || height <= 0)
+        if ((width <= 0) || (height <= 0))
         {
             LOGE("Compositor bug! Xwayland surface configured with ",
                 width, "x", height);
@@ -486,7 +489,7 @@ class xwayland_dnd_view_t : public wf::wlr_view_t
             return;
         }
 
-        wf::geometry_t bbox {
+        wf::geometry_t bbox{
             xw->x,
             xw->y,
             xw->width,
@@ -600,7 +603,7 @@ class xwayland_view_controller_t
     xwayland_view_controller_t(wlr_xwayland_surface *xw)
     {
         this->main_surface = std::make_shared<xw::xwayland_surface_t>(xw);
-        this->dsurface = std::make_shared<wf::xwayland_desktop_surface_t>(xw);
+        this->dsurface     = std::make_shared<wf::xwayland_desktop_surface_t>(xw);
 
         on_map.set_callback([&] (void*)
         {
@@ -665,16 +668,21 @@ class xwayland_view_controller_t
         switch (actual_type)
         {
           case window_type_t::DND:
-            view = std::make_unique<xw::xwayland_dnd_view_t>(main_surface, dsurface, xw);
+            view = std::make_unique<xw::xwayland_dnd_view_t>(main_surface,
+                dsurface, xw);
             dnd_view = {view};
             break;
+
           case window_type_t::OR:
-            view = std::make_unique<xw::xwayland_or_view_t>(main_surface, dsurface, xw);
+            view = std::make_unique<xw::xwayland_or_view_t>(main_surface, dsurface,
+                xw);
             break;
+
           case window_type_t::DIALOG:
-            // fallthrough
+          // fallthrough
           case window_type_t::TOPLEVEL:
-            view = std::make_unique<xw::xwayland_toplevel_view_t>(main_surface, dsurface, xw);
+            view = std::make_unique<xw::xwayland_toplevel_view_t>(main_surface,
+                dsurface, xw);
             break;
         }
 
