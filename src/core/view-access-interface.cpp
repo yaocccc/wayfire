@@ -32,6 +32,8 @@ variant_t view_access_interface_t::get(const std::string & identifier, bool & er
         return out;
     }
 
+    uint32_t tiled_edges = _view->topl() ? _view->topl()->pending().tiled_edges : 0;
+
     if (identifier == "app_id")
     {
         out = _view->dsurf()->get_app_id();
@@ -63,13 +65,13 @@ variant_t view_access_interface_t::get(const std::string & identifier, bool & er
         }
     } else if (identifier == "fullscreen")
     {
-        out = _view->fullscreen;
+        out = _view->topl() ? _view->topl()->pending().fullscreen : false;
     } else if (identifier == "activated")
     {
-        out = _view->activated;
+        out = _view->topl() ? _view->topl()->pending().activated : false;
     } else if (identifier == "minimized")
     {
-        out = _view->minimized;
+        out = _view->topl() ? _view->topl()->pending().minimized : false;
     } else if (identifier == "visible")
     {
         out = _view->is_visible();
@@ -81,22 +83,22 @@ variant_t view_access_interface_t::get(const std::string & identifier, bool & er
         out = _view->is_mapped();
     } else if (identifier == "tiled-left")
     {
-        out = (_view->tiled_edges & WLR_EDGE_LEFT) > 0;
+        out = (tiled_edges & WLR_EDGE_LEFT) > 0;
     } else if (identifier == "tiled-right")
     {
-        out = (_view->tiled_edges & WLR_EDGE_RIGHT) > 0;
+        out = (tiled_edges & WLR_EDGE_RIGHT) > 0;
     } else if (identifier == "tiled-top")
     {
-        out = (_view->tiled_edges & WLR_EDGE_TOP) > 0;
+        out = (tiled_edges & WLR_EDGE_TOP) > 0;
     } else if (identifier == "tiled-bottom")
     {
-        out = (_view->tiled_edges & WLR_EDGE_BOTTOM) > 0;
+        out = (tiled_edges & WLR_EDGE_BOTTOM) > 0;
     } else if (identifier == "maximized")
     {
-        out = _view->tiled_edges == TILED_EDGES_ALL;
+        out = tiled_edges == TILED_EDGES_ALL;
     } else if (identifier == "floating")
     {
-        out = _view->tiled_edges == 0;
+        out = tiled_edges == 0;
     } else if (identifier == "type")
     {
         do {

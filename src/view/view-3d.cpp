@@ -116,7 +116,7 @@ static void rotate_xy(float& x, float& y, float angle)
 wf::pointf_t wf::view_2D::transform_point(
     wf::geometry_t geometry, wf::pointf_t point)
 {
-    auto wm_geom = view->transform_region(view->get_wm_geometry(), this);
+    auto wm_geom = view->transform_region(view->get_main_geometry(), this);
     auto p2 = get_center_relative_coords(wm_geom, point);
     float x = p2.x, y = p2.y;
 
@@ -134,7 +134,7 @@ wf::pointf_t wf::view_2D::transform_point(
 wf::pointf_t wf::view_2D::untransform_point(
     wf::geometry_t geometry, wf::pointf_t point)
 {
-    auto wm_geom = view->transform_region(view->get_wm_geometry(), this);
+    auto wm_geom = view->transform_region(view->get_main_geometry(), this);
     point = get_center_relative_coords(wm_geom, point);
     float x = point.x, y = point.y;
 
@@ -150,7 +150,7 @@ wf::pointf_t wf::view_2D::untransform_point(
 void wf::view_2D::render_box(wf::texture_t src_tex, wlr_box src_box,
     wlr_box scissor_box, const wf::framebuffer_t& fb)
 {
-    auto wm_geom = view->transform_region(view->get_wm_geometry(), this);
+    auto wm_geom = view->transform_region(view->get_main_geometry(), this);
     auto quad    = center_geometry(fb.geometry, src_box, get_center(wm_geom));
 
     quad.geometry.x1 *= scale_x;
@@ -208,7 +208,7 @@ glm::mat4 wf::view_3D::calculate_total_transform()
 wf::pointf_t wf::view_3D::transform_point(
     wf::geometry_t geometry, wf::pointf_t point)
 {
-    auto wm_geom = view->transform_region(view->get_wm_geometry(), this);
+    auto wm_geom = view->transform_region(view->get_main_geometry(), this);
     auto p = get_center_relative_coords(wm_geom, point);
     glm::vec4 v(1.0f * p.x, 1.0f * p.y, 0, 1);
     v = calculate_total_transform() * v;
@@ -232,7 +232,7 @@ wf::pointf_t wf::view_3D::transform_point(
 wf::pointf_t wf::view_3D::untransform_point(wf::geometry_t geometry,
     wf::pointf_t point)
 {
-    auto wm_geom = view->transform_region(view->get_wm_geometry(), this);
+    auto wm_geom = view->transform_region(view->get_main_geometry(), this);
     auto p  = get_center_relative_coords(wm_geom, point);
     auto tr = calculate_total_transform();
 
@@ -268,7 +268,7 @@ wf::pointf_t wf::view_3D::untransform_point(wf::geometry_t geometry,
 void wf::view_3D::render_box(wf::texture_t src_tex, wlr_box src_box,
     wlr_box scissor_box, const wf::framebuffer_t& fb)
 {
-    auto wm_geom = view->transform_region(view->get_wm_geometry(), this);
+    auto wm_geom = view->transform_region(view->get_main_geometry(), this);
     auto quad    = center_geometry(fb.geometry, src_box, get_center(wm_geom));
 
     auto transform = calculate_total_transform();

@@ -158,6 +158,9 @@ void wf::wlr_view_t::set_position(wf::point_t point)
 void wf::wlr_view_t::map()
 {
     this->mapped = true;
+    // FIXME: for surfaces, mapped/unmapped state doesn't really matter,
+    // this is a toplevel construct. As a result, surfaces shouldn't really
+    // have a mapped state and the next line shouldn't be necessary ...
     dynamic_cast<wf::wlr_surface_base_t*>(get_main_surface().get())->map();
     if (dsurf()->get_role() == desktop_surface_t::role::TOPLEVEL)
     {

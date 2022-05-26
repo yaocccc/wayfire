@@ -1,8 +1,9 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
+#include <wayfire/signal-definitions.hpp>
 
-#include "xdg-shell.hpp"
+#include "../xdg-shell/xdg-shell.hpp"
 #include "wayfire/core.hpp"
 #include "wayfire/debug.hpp"
 #include <wayfire/util/log.hpp>
@@ -10,17 +11,82 @@
 #include "wayfire/output.hpp"
 #include "wayfire/workspace-manager.hpp"
 #include "wayfire/output-layout.hpp"
-#include "view-impl.hpp"
+#include "../view-impl.hpp"
+#include "../wlr-desktop-surface.hpp"
 
 static const uint32_t both_vert =
     ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM;
 static const uint32_t both_horiz =
     ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT | ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT;
 
+namespace wf
+{
+namespace lshell
+{
+class layer_desktop_surface_t : public wlr_desktop_surface_t
+{
+  public:
+    layer_desktop_surface_t(wlr_layer_surface_v1 *surf) :
+        wlr_desktop_surface_t(surf->surface), layer_surface(surf)
+    {
+        current_role = wf::desktop_surface_t::role::DESKTOP_ENVIRONMENT;
+
+        on_destroy.set_callback([&] (void*)
+        {
+            destroy();
+        });
+
+        on_commit.set_callback([&] (void*)
+        {
+            update_keyboard_interactivity();
+        });
+
+        on_destroy.connect(&surf->events.destroy);
+        on_commit.connect(&surf->surface->events.commit);
+        update_keyboard_interactivity();
+        this->set_app_id(nonull(surf->namespace_t));
+    }
+
+    void ping() final
+    {
+        // no-op for layer-shell
+    }
+
+    wf::wl_listener_wrapper on_destroy;
+    wf::wl_listener_wrapper on_commit;
+    wlr_layer_surface_v1 *layer_surface;
+
+    void update_keyboard_interactivity()
+    {
+        /* Update the keyboard focus enabled state. If a refocusing is needed, i.e
+         * the view state changed, then this will happen when arranging layers */
+        keyboard_focus_enabled = layer_surface->current.keyboard_interactive;
+    }
+
+    void destroy()
+    {
+        on_destroy.disconnect();
+        on_commit.disconnect();
+        layer_surface = NULL;
+    }
+
+    void close() final
+    {
+        if (layer_surface)
+        {
+            wlr_layer_surface_v1_destroy(layer_surface);
+        }
+    }
+};
+
+}
+}
+
 class wayfire_layer_shell_view : public wf::wlr_view_t
 {
     wf::wl_listener_wrapper on_map, on_unmap, on_destroy, on_new_popup;
     wf::wl_listener_wrapper on_commit_unmapped;
+    wf::signal_connection_t on_self_output_changed;
 
   protected:
     void initialize() override;
@@ -42,12 +108,9 @@ class wayfire_layer_shell_view : public wf::wlr_view_t
     void map() override;
     void unmap() override;
     void commit() override;
-    void close() override;
     void destroy() override;
 
     void configure(wf::geometry_t geometry);
-
-    void set_output(wf::output_t *output) override;
 
     /** Calculate the target layer for this layer surface */
     wf::layer_t get_layer();
@@ -344,9 +407,24 @@ wayfire_layer_shell_view::wayfire_layer_shell_view(wlr_layer_surface_v1 *lsurf) 
     auto surf = std::make_shared<wf::wlr_surface_base_t>(lsurf->surface);
     this->set_main_surface(surf);
 
-    dsurface->current_role = wf::desktop_surface_t::role::DESKTOP_ENVIRONMENT;
+    auto dsurf = std::make_shared<wf::lshell::layer_desktop_surface_t>(lsurf);
+    this->set_desktop_surface(dsurf);
+
     std::memset(&this->prev_state, 0, sizeof(prev_state));
-    sticky = true;
+    set_sticky(true);
+
+    on_self_output_changed.set_callback([=] (wf::signal_data_t *data)
+    {
+        auto ev = static_cast<wf::view_set_output_signal*>(data);
+        if (ev->output != this->get_output())
+        {
+            // Happens in two cases:
+            // View's output is being destroyed, no point in reflowing
+            // View is about to be mapped, no anchored area at all.
+            this->remove_anchored(false);
+        }
+    });
+    this->connect_signal("set-output", &on_self_output_changed);
 
     /* If we already have an output set, then assign it before core assigns us
      * an output */
@@ -363,8 +441,7 @@ void wayfire_layer_shell_view::initialize()
     if (!get_output())
     {
         LOGE("Couldn't find output for the layer surface");
-        close();
-
+        dsurf()->close();
         return;
     }
 
@@ -455,10 +532,6 @@ void wayfire_layer_shell_view::map()
     // Disconnect, from now on regular commits will work
     on_commit_unmapped.disconnect();
 
-    /* Read initial data */
-    dsurface->keyboard_focus_enabled = lsurface->current.keyboard_interactive;
-    handle_app_id_changed(nonull(lsurface->namespace_t));
-
     get_output()->workspace->add_view(self(), get_layer());
     wf::wlr_view_t::map();
     wf_layer_shell_manager::get_instance().handle_map(this);
@@ -475,9 +548,6 @@ void wayfire_layer_shell_view::commit()
     wf::wlr_view_t::commit();
 
     auto state = &lsurface->current;
-    /* Update the keyboard focus enabled state. If a refocusing is needed, i.e
-     * the view state changed, then this will happen when arranging layers */
-    dsurface->keyboard_focus_enabled = state->keyboard_interactive;
 
     if (state->committed)
     {
@@ -494,28 +564,6 @@ void wayfire_layer_shell_view::commit()
         }
 
         prev_state = *state;
-    }
-}
-
-void wayfire_layer_shell_view::set_output(wf::output_t *output)
-{
-    if (this->get_output() != output)
-    {
-        // Happens in two cases:
-        // View's output is being destroyed, no point in reflowing
-        // View is about to be mapped, no anchored area at all.
-        this->remove_anchored(false);
-    }
-
-    wf::wlr_view_t::set_output(output);
-}
-
-void wayfire_layer_shell_view::close()
-{
-    if (lsurface)
-    {
-        wf::wlr_view_t::close();
-        wlr_layer_surface_v1_destroy(lsurface);
     }
 }
 
@@ -549,10 +597,11 @@ void wayfire_layer_shell_view::configure(wf::geometry_t box)
     if ((box.width < 0) || (box.height < 0))
     {
         LOGE("layer-surface has calculated width and height < 0");
-        close();
+        dsurf()->close();
     }
 
-    wf::wlr_view_t::move(box.x, box.y);
+    this->origin = wf::origin(box);
+    update_bbox();
     wlr_layer_surface_v1_configure(lsurface, box.width, box.height);
 }
 

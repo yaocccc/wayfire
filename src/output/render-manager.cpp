@@ -841,7 +841,7 @@ class wf::render_manager::impl
         auto candidate = views.front();
 
         // The candidate must cover the whole output
-        if (candidate->get_output_geometry() != output->get_relative_geometry())
+        if (candidate->get_bounding_box() != output->get_relative_geometry())
         {
             return false;
         }
@@ -1203,12 +1203,8 @@ class wf::render_manager::impl
         auto xw_dnd_icon = wf::get_xwayland_drag_icon();
         if (xw_dnd_icon)
         {
-            wf::point_t dnd_output = wf::origin(
-                xw_dnd_icon->get_output()->get_layout_geometry());
             wf::point_t current_output = wf::origin(output->get_layout_geometry());
-            auto origin = wf::origin(xw_dnd_icon->get_output_geometry()) +
-                dnd_output + -current_output;
-
+            auto origin = xw_dnd_icon->get_origin() + -current_output;
             auto dnd_surface = xw_dnd_icon->get_main_surface();
             for (auto& child : dnd_surface->enumerate_surfaces(true))
             {
@@ -1254,7 +1250,7 @@ class wf::render_manager::impl
                     continue;
                 }
 
-                if (view->sticky)
+                if (view->is_sticky())
                 {
                     view_delta = {repaint.ws_dx, repaint.ws_dy};
                 }
@@ -1275,12 +1271,12 @@ class wf::render_manager::impl
                 {
                     /* Make sure view position is relative to the workspace
                      * being rendered */
-                    auto obox = view->get_output_geometry() + view_delta;
+                    auto origin = view->get_origin() + view_delta;
                     for (auto& child :
                          view->get_main_surface()->enumerate_surfaces(true))
                     {
                         schedule_surface(repaint, child.surface,
-                            wf::origin(obox) + child.position);
+                            origin + child.position);
                     }
                 }
             }

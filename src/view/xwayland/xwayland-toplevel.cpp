@@ -61,21 +61,15 @@ wf::xwayland_toplevel_t::xwayland_toplevel_t(
             wf::toplevel_focus_request_signal data;
             data.toplevel     = {this};
             data.self_request = true;
-            emit_signal("toplevel-focus-request", &data);
-            wf::get_core().emit_signal("view-focus-request", &data);
+            emit_toplevel_signal(this, "focus-request", &data);
         }
     });
     on_set_hints.set_callback([&] (void*)
     {
         wf::toplevel_hints_changed_signal data;
         data.toplevel = {this};
-        if (xw->hints_urgency)
-        {
-            data.demands_attention = true;
-        }
-
-        wf::get_core().emit_signal("view-hints-changed", &data);
-        this->emit_signal("hints-changed", &data);
+        data.demands_attention = !!(xw->hints_urgency);
+        emit_toplevel_signal(this, "hints-changed", &data);
     });
 
     on_commit.connect(&xw->surface->events.commit);

@@ -83,7 +83,7 @@ class wlr_surface_base_t : public wf::surface_interface_t,
     wf::dimensions_t get_size() const final;
     void schedule_redraw(const timespec& frame_end) final;
     void set_visible_on_output(wf::output_t *output, bool is_visible) override;
-    wf::region_t get_opaque_region() final;
+    wf::region_t get_opaque_region() override;
     void simple_render(const wf::framebuffer_t& fb, wf::point_t pos,
         const wf::region_t& damage) final;
 

@@ -125,6 +125,7 @@ class wlr_view_t : public wf::view_interface_t
     // Track toplevel for position, damage whenever it changes
     void setup_toplevel_tracking();
 
+  public:
     virtual void commit();
     virtual void map();
     virtual void unmap();
@@ -153,6 +154,8 @@ wf::geometry_t shrink_by_margins(
 
 wf::geometry_t expand_with_margins(
     wf::geometry_t g, wf::decoration_margin_t margin);
+
+wayfire_view find_toplevel_parent(wayfire_view view);
 
 /**
  * Emit @signal_name on the @view with @data as signal data.

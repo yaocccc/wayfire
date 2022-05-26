@@ -307,6 +307,17 @@ class view_interface_t : public wf::object_base_t
     wf::geometry_t get_untransformed_bounding_box();
 
     /**
+     * Get the untransformed 'main' part of the view's surface tree.
+     * For views with associated toplevels, this is their current geometry,
+     * translated to the view's output if it is different.
+     * For other views, this is just the geometry of the main surface.
+     *
+     * This geometry serves as a rough approximation of where the view 'is',
+     * regardless of its type.
+     */
+    wf::geometry_t get_main_geometry();
+
+    /**
      * Get the coordinates of the top-left corner of the view in the coordinate
      * system of its output.
      *

@@ -602,7 +602,7 @@ class output_viewport_manager_t
     {
         auto og = output->get_screen_size();
 
-        auto wm = view->transform_region(view->get_wm_geometry());
+        auto wm = view->transform_region(view->get_main_geometry());
         wf::point_t workspace = {
             (int)std::floor((wm.x + wm.width / 2.0) / og.width),
             (int)std::floor((wm.y + wm.height / 2.0) / og.height)
@@ -620,7 +620,7 @@ class output_viewport_manager_t
     bool view_visible_on(wayfire_view view, wf::point_t vp)
     {
         auto g = output->get_relative_geometry();
-        if (!view->sticky)
+        if (!view->is_sticky())
         {
             g.x += (vp.x - current_vx) * g.width;
             g.y += (vp.y - current_vy) * g.height;
@@ -631,7 +631,7 @@ class output_viewport_manager_t
             return view->intersects_region(g);
         } else
         {
-            return g & view->get_wm_geometry();
+            return g & view->get_main_geometry();
         }
     }
 

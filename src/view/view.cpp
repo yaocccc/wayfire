@@ -23,7 +23,7 @@ static void unset_toplevel_parent(wayfire_view view)
     }
 }
 
-static wayfire_view find_toplevel_parent(wayfire_view view)
+wayfire_view wf::find_toplevel_parent(wayfire_view view)
 {
     while (view->parent)
     {
@@ -447,6 +447,20 @@ void wf::view_interface_t::pop_transformer(std::string name)
 bool wf::view_interface_t::has_transformer()
 {
     return view_impl->transforms.size();
+}
+
+wf::geometry_t wf::view_interface_t::get_main_geometry()
+{
+    if (topl())
+    {
+        // FIXME: Translate if the output is different.
+        // Right now, this is not implemented as there are no plugins which
+        // create multiple views for the same toplevel.
+        return topl()->current().geometry;
+    }
+
+    return wf::construct_box(get_origin(),
+        get_main_surface()->output().get_size());
 }
 
 wf::geometry_t wf::view_interface_t::get_untransformed_bounding_box()
