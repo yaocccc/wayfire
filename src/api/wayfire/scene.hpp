@@ -111,16 +111,12 @@ class base_container_t : public node_t
  * The root (Level 1) node of the whole scenegraph.
  */
 class root_node_t : public node_t
-{
-};
+{};
 
 /**
  * A node which represents a layer (Level 2) in the scenegraph.
  */
 class layer_node_t : public node_t
-{
-};
-
-
+{};
 }
 }
