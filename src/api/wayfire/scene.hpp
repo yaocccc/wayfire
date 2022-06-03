@@ -9,14 +9,13 @@
 namespace wf
 {
 class surface_interface_t;
+class output_t;
 /**
  * Contains definitions of the common elements used in Wayfire's scenegraph.
  *
  * The scenegraph is a complete representation of the current rendering and input
  * state of Wayfire. The basic nodes forms a tree where every node is responsible
- * for managing its children's state. More advanced nodes like workspace stream
- * nodes may also add additional edges which make the scenegraph a directed
- * acyclic graph.
+ * for managing its children's state.
  *
  * The rough structure of the scenegraph is as follows:
  *
@@ -73,6 +72,10 @@ struct input_node_t
     // FIXME: In the future, this should be a separate interface, allowing
     // non-surface nodes to get user input as well.
     wf::surface_interface_t *surface;
+
+    input_node_t(const node_ptr& _node, wf::surface_interface_t *si) :
+        node(_node), surface(si)
+    {}
 };
 
 /**
@@ -86,37 +89,117 @@ class node_t
     /**
      * Find the input node at the given position.
      */
-    virtual const node_ptr& find_node_at(const wf::pointf_t& at) = 0;
+    virtual const input_node_t& find_node_at(const wf::pointf_t& at) = 0;
+
+    /**
+     * Structure nodes are special nodes which core usually creates when Wayfire
+     * is started (e.g. layer and output nodes). These nodes should not be
+     * reordered or removed from the scenegraph.
+     */
+    bool is_structure_node() const
+    {
+        return _is_structure;
+    }
+
+    const node_ptr& parent() const
+    {
+        return this->_parent;
+    }
 
   public:
     node_t(const node_t&) = delete;
     node_t(node_t&&) = delete;
     node_t& operator =(const node_t&) = delete;
     node_t& operator =(node_t&&) = delete;
+
+  protected:
+    node_t(bool is_structure);
+    bool _is_structure;
+    node_ptr _parent;
 };
 
 /**
- * A node (at any level) which has several children nodes and delegates
- * work to them.
+ * An inner node of the scenegraph tree with a floating list of children.
+ * Plugins may add additional nodes and reorder them, however, special care
+ * needs to be taken to avoid reordering the special `structure` nodes.
  */
-class base_container_t : public node_t
+class inner_node_t : public node_t
 {
-    virtual const node_ptr& find_node_at(const wf::pointf_t& at) = 0;
+  public:
+    /**
+     * Find the input node at the given position.
+     */
+    const input_node_t& find_node_at(const wf::pointf_t& at) final;
 
-  protected:
+    /**
+     * A list of children nodes sorted from top to bottom.
+     *
+     * Note on special `structure` nodes: These nodes are typically present in
+     * the normal list of children, but also accessible via a specialized pointer
+     * in their parent's class.
+     */
     std::vector<std::shared_ptr<node_t>> children;
 };
+
+class output_node_t : public inner_node_t
+{
+  public:
+    /**
+     * A container for the static child nodes.
+     * Static child nodes are always below the dynamic nodes of an output and
+     * are usually not modified when the workspace on the output changes, so
+     * things like backgrounds and panels are usually static.
+     */
+    std::shared_ptr<inner_node_t> _static;
+
+    /**
+     * A container for the dynamic child nodes.
+     * The most common example for floating nodes are toplevel views which
+     * follow the
+     *  std::shared_ptr<floating_container_t> dynamic;
+     *  };
+     *
+     *  /**
+     * A node which represents a layer (Level 2) in the scenegraph.
+     */
+    class layer_node_t : public inner_node_t
+    {
+      public:
+        /**
+         * Find the child node corresponding to the given output.
+         */
+        const std::shared_ptr<output_node_t>& node_for_output(wf::output_t *output);
+    };
+
+/**
+ * A list of all layers in the root node.
+ */
+    enum class layer : size_t
+    {
+        BACKGROUND = 0,
+        BOTTOM     = 1,
+        WORKSPACE  = 2,
+        TOP        = 3,
+        UNMANAGED  = 4,
+        OVERLAY    = 5,
+        /** Not a real layer, but a placeholder for the number of layers. */
+        ALL_LAYERS,
+    };
+
+    class layer_node_t;
 
 /**
  * The root (Level 1) node of the whole scenegraph.
  */
-class root_node_t : public node_t
-{};
+    class root_node_t : public node_t
+    {
+      public:
+        const input_node_t& find_node_at(const wf::pointf_t& at) final;
 
-/**
- * A node which represents a layer (Level 2) in the scenegraph.
- */
-class layer_node_t : public node_t
-{};
+        /**
+         * An ordered list of all layers' nodes.
+         */
+        std::shared_ptr<layer_node_t> layers[(size_t)layer::ALL_LAYERS];
+    };
 }
 }
