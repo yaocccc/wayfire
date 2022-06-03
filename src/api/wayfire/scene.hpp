@@ -73,8 +73,8 @@ struct input_node_t
     // non-surface nodes to get user input as well.
     wf::surface_interface_t *surface;
 
-    input_node_t(const node_ptr& _node, wf::surface_interface_t *si)
-        : node(_node), surface(si)
+    input_node_t(const node_ptr& _node, wf::surface_interface_t *si) :
+        node(_node), surface(si)
     {}
 };
 
@@ -155,51 +155,51 @@ class output_node_t : public inner_node_t
     /**
      * A container for the dynamic child nodes.
      * The most common example for floating nodes are toplevel views which
-     * follow the 
-    std::shared_ptr<floating_container_t> dynamic;
-};
-
-/**
- * A node which represents a layer (Level 2) in the scenegraph.
- */
-class layer_node_t : public inner_node_t
-{
-  public:
-    /**
-     * Find the child node corresponding to the given output.
+     * follow the
+     *  std::shared_ptr<floating_container_t> dynamic;
+     *  };
+     *
+     *  /**
+     * A node which represents a layer (Level 2) in the scenegraph.
      */
-    const std::shared_ptr<output_node_t>& node_for_output(wf::output_t *output);
-};
+    class layer_node_t : public inner_node_t
+    {
+      public:
+        /**
+         * Find the child node corresponding to the given output.
+         */
+        const std::shared_ptr<output_node_t>& node_for_output(wf::output_t *output);
+    };
 
 /**
  * A list of all layers in the root node.
  */
-enum class layer : size_t
-{
-    BACKGROUND = 0,
-    BOTTOM     = 1,
-    WORKSPACE  = 2,
-    TOP        = 3,
-    UNMANAGED  = 4,
-    OVERLAY    = 5,
+    enum class layer : size_t
+    {
+        BACKGROUND = 0,
+        BOTTOM     = 1,
+        WORKSPACE  = 2,
+        TOP        = 3,
+        UNMANAGED  = 4,
+        OVERLAY    = 5,
+        /** Not a real layer, but a placeholder for the number of layers. */
+        ALL_LAYERS,
+    };
 
-    /** Not a real layer, but a placeholder for the number of layers. */
-    ALL_LAYERS,
-};
-class layer_node_t;
+    class layer_node_t;
 
 /**
  * The root (Level 1) node of the whole scenegraph.
  */
-class root_node_t : public node_t
-{
-  public:
-    const input_node_t& find_node_at(const wf::pointf_t& at) final;
+    class root_node_t : public node_t
+    {
+      public:
+        const input_node_t& find_node_at(const wf::pointf_t& at) final;
 
-    /**
-     * An ordered list of all layers' nodes.
-     */
-    std::shared_ptr<layer_node_t> layers[(size_t)layer::ALL_LAYERS];
-};
+        /**
+         * An ordered list of all layers' nodes.
+         */
+        std::shared_ptr<layer_node_t> layers[(size_t)layer::ALL_LAYERS];
+    };
 }
 }
