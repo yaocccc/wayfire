@@ -18,7 +18,7 @@ template<class SignalType>
 class connection_t final
 {
   public:
-    using callback = std::function<void(SignalType*)>;
+    using callback = std::function<void (SignalType*)>;
     /** Initialize an empty signal connection */
     connection_t();
     /** Automatically disconnects from all providers */
@@ -58,20 +58,18 @@ class connection_t final
 
 template<class SignalType>
 struct determine_signal_name
-{
-
-};
+{};
 
 class provider_t
 {
   public:
     /**
      * Signals are designed to be useful for C++ plugins, however, they are
-     * generally quite difficult to 
-    using c_api_callback = std::function<void(void*, void*, const char*)>;
-
-
-    /** Register a connection to be called when the given signal is emitted. */
+     * generally quite difficult to
+     *  using c_api_callback = std::function<void(void*, void*, const char*)>;
+     *
+     *
+     *  /** Register a connection to be called when the given signal is emitted. */
     template<class SignalType>
     void connect_signal(connection_t<SignalType> *callback);
     /** Unregister a connection. */
@@ -81,8 +79,7 @@ class provider_t
     /** Emit the given signal. */
     template<class SignalType>
     void emit_signal(SignalType *data, std::string_view name = SignalType::name)
-    {
-    }
+    {}
 
     provider_t();
     virtual ~provider_t();
