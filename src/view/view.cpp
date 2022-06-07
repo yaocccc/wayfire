@@ -614,7 +614,7 @@ void wf::view_interface_t::tile_request(uint32_t edges, wf::point_t workspace)
     set_tiled(edges);
     if (is_mapped())
     {
-        get_output()->emit_signal("view-tile-request", &data);
+        get_output()->emit(&data);
     }
 
     if (!data.carried_out)

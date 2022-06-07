@@ -345,9 +345,9 @@ class tile_plugin_t : public wf::plugin_interface_t
         update_root_size(output->workspace->get_workarea());
     };
 
-    signal_connection_t on_tile_request = [=] (signal_data_t *data)
+    wf::signal::connection_t<view_tile_request_signal> on_tile_request =
+        [=] (view_tile_request_signal *ev)
     {
-        auto ev = static_cast<view_tile_request_signal*>(data);
         if (ev->carried_out || !tile::view_node_t::get_node(ev->view))
         {
             return;
@@ -577,7 +577,7 @@ class tile_plugin_t : public wf::plugin_interface_t
         output->connect_signal("view-layer-attached", &on_view_attached);
         output->connect_signal("view-layer-detached", &on_view_detached);
         output->connect_signal("workarea-changed", &on_workarea_changed);
-        output->connect_signal("view-tile-request", &on_tile_request);
+        output->connect(&on_tile_request);
         output->connect_signal("view-fullscreen-request",
             &on_fullscreen_request);
         output->connect_signal("view-focused", &on_focus_changed);

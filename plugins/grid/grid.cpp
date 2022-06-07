@@ -157,7 +157,7 @@ class wayfire_grid : public wf::plugin_interface_t
         output->connect_signal("workarea-changed", &on_workarea_changed);
         output->connect_signal("grid-snap-view", &on_snap_signal);
         output->connect_signal("grid-query-geometry", &on_snap_query);
-        output->connect_signal("view-tile-request", &on_maximize_signal);
+        output->connect(&on_maximize_signal);
         output->connect_signal("view-fullscreen-request", &on_fullscreen_signal);
     }
 
@@ -276,10 +276,9 @@ class wayfire_grid : public wf::plugin_interface_t
         return geometry;
     }
 
-    wf::signal_connection_t on_maximize_signal = [=] (wf::signal_data_t *ddata)
+    wf::signal::connection_t<wf::view_tile_request_signal> on_maximize_signal =
+        [=] (wf::view_tile_request_signal *data)
     {
-        auto data = static_cast<wf::view_tile_request_signal*>(ddata);
-
         if (data->carried_out || (data->desired_size.width <= 0) ||
             !can_adjust_view(data->view))
         {

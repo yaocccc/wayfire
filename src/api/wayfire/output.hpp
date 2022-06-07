@@ -4,6 +4,7 @@
 #include "wayfire/geometry.hpp"
 #include "wayfire/object.hpp"
 #include "wayfire/bindings.hpp"
+#include "wayfire/signal-provider.hpp"
 
 #include <wayfire/nonstd/wlroots.hpp>
 #include <wayfire/option-wrapper.hpp>
@@ -43,7 +44,7 @@ enum plugin_activation_flags_t
     PLUGIN_ACTIVATE_ALLOW_MULTIPLE   = (1 << 1),
 };
 
-class output_t : public wf::object_base_t
+class output_t : public wf::object_base_t, public signal::provider_t
 {
   public:
     /**

@@ -9,6 +9,7 @@
 #include "wayfire/decorator.hpp"
 #include <wayfire/nonstd/wlroots.hpp>
 #include <wayfire/region.hpp>
+#include <wayfire/signal-provider.hpp>
 
 namespace wf
 {
@@ -49,7 +50,7 @@ constexpr uint32_t TILED_EDGES_ALL =
  * view_interface_t is the base class for all "toplevel windows", i.e surfaces
  * which have no parent.
  */
-class view_interface_t : public surface_interface_t
+class view_interface_t : public surface_interface_t, public signal::provider_t
 {
   public:
     /**

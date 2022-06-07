@@ -471,14 +471,17 @@ struct view_tiled_signal : public _view_signal
 };
 
 /**
- * name: view-tile-request
  * on: output
  * when: Emitted whenever some entity requests that the view's tiled edges
  *   change. If no plugin is available to service the request, it is carried
  *   out by core. See view_interface_t::tile_request()
  */
-struct view_tile_request_signal : public _view_signal
+struct view_tile_request_signal
 {
+    static constexpr const char *c_name = "view-tile-request";
+
+    wayfire_view view;
+
     /** The desired edges */
     uint32_t edges;
 
@@ -500,7 +503,6 @@ struct view_tile_request_signal : public _view_signal
      */
     bool carried_out = false;
 };
-
 
 /**
  * name: fullscreen
