@@ -82,11 +82,10 @@ output_node_t::output_node_t() : inner_node_t(true)
 }
 
 layer_node_t::layer_node_t() : inner_node_t(true)
-{
-}
+{}
 
 const std::shared_ptr<output_node_t>& layer_node_t::node_for_output(
-    wf::output_t* output)
+    wf::output_t *output)
 {
     auto it = outputs.find(output);
     if (it != outputs.end())
@@ -99,7 +98,7 @@ const std::shared_ptr<output_node_t>& layer_node_t::node_for_output(
     return null_output;
 }
 
-void layer_node_t::handle_outputs_changed(wf::output_t* output, bool add)
+void layer_node_t::handle_outputs_changed(wf::output_t *output, bool add)
 {
     auto list = this->get_children();
 
@@ -129,6 +128,5 @@ root_node_t::root_node_t() : inner_node_t(true)
 
     set_children_unchecked(children);
 }
-
 } // namespace scene
 }

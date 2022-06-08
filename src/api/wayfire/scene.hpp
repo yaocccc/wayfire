@@ -213,13 +213,13 @@ class layer_node_t : public inner_node_t
     /**
      * Find the child node corresponding to the given output.
      */
-    const std::shared_ptr<output_node_t>& node_for_output(wf::output_t* output);
+    const std::shared_ptr<output_node_t>& node_for_output(wf::output_t *output);
 
   private:
     std::map<wf::output_t*, std::shared_ptr<output_node_t>> outputs;
 
     // Called by output-layout when the outputs change
-    void handle_outputs_changed(wf::output_t* output, bool add);
+    void handle_outputs_changed(wf::output_t *output, bool add);
     friend class wf::output_layout_t;
 };
 
