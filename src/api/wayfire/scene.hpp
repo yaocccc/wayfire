@@ -3,6 +3,7 @@
 #include <optional>
 #include <memory>
 #include <vector>
+#include <map>
 #include <wayfire/geometry.hpp>
 #include <wayfire/region.hpp>
 
@@ -10,6 +11,7 @@ namespace wf
 {
 class surface_interface_t;
 class output_t;
+class output_layout_t;
 /**
  * Contains definitions of the common elements used in Wayfire's scenegraph.
  *
@@ -61,7 +63,9 @@ class output_t;
 namespace scene
 {
 class node_t;
+class inner_node_t;
 using node_ptr = std::shared_ptr<node_t>;
+using inner_node_ptr = std::shared_ptr<inner_node_t>;
 
 /**
  * Used as a result of an intersection of the scenegraph with the user input.
@@ -89,7 +93,7 @@ class node_t
     /**
      * Find the input node at the given position.
      */
-    virtual const input_node_t& find_node_at(const wf::pointf_t& at) = 0;
+    virtual std::optional<input_node_t> find_node_at(const wf::pointf_t& at) = 0;
 
     /**
      * Structure nodes are special nodes which core usually creates when Wayfire
@@ -101,7 +105,10 @@ class node_t
         return _is_structure;
     }
 
-    const node_ptr& parent() const
+    /**
+     * Get the parent of the current node in the scene graph.
+     */
+    inner_node_t *parent() const
     {
         return this->_parent;
     }
@@ -115,7 +122,8 @@ class node_t
   protected:
     node_t(bool is_structure);
     bool _is_structure;
-    node_ptr _parent;
+    inner_node_t *_parent;
+    friend class inner_node_t;
 };
 
 /**
@@ -126,11 +134,38 @@ class node_t
 class inner_node_t : public node_t
 {
   public:
+    inner_node_t(bool _is_structure);
+
     /**
      * Find the input node at the given position.
      */
-    const input_node_t& find_node_at(const wf::pointf_t& at) final;
+    std::optional<input_node_t> find_node_at(const wf::pointf_t& at) final;
 
+    /**
+     * Obtain an immutable list of the node's children.
+     * Use set_children_list() to modify the children.
+     */
+    const std::vector<node_ptr>& get_children() const
+    {
+        return children;
+    }
+
+    /**
+     * Exchange the list of children of this node.
+     * A typical usage (for example, bringing a node to the top):
+     * 1. list = get_children()
+     * 2. list.erase(target_node)
+     * 3. list.insert(list.begin(), target_node)
+     * 4. set_children_list(list)
+     *
+     * The set_children_list function also performs checks on the structure
+     * nodes present in the inner node. If they were changed, the change is
+     * rejected and false is returned. In all other cases, the list of
+     * children is updated, and each child's parent is set to this node.
+     */
+    bool set_children_list(std::vector<node_ptr> new_list);
+
+  protected:
     /**
      * A list of children nodes sorted from top to bottom.
      *
@@ -139,11 +174,18 @@ class inner_node_t : public node_t
      * in their parent's class.
      */
     std::vector<std::shared_ptr<node_t>> children;
+
+    void set_children_unchecked(std::vector<node_ptr> new_list);
 };
 
+/**
+ * A Level 3 node which represents each output in each layer.
+ */
 class output_node_t : public inner_node_t
 {
   public:
+    output_node_t();
+
     /**
      * A container for the static child nodes.
      * Static child nodes are always below the dynamic nodes of an output and
@@ -154,52 +196,60 @@ class output_node_t : public inner_node_t
 
     /**
      * A container for the dynamic child nodes.
-     * The most common example for floating nodes are toplevel views which
-     * follow the
-     *  std::shared_ptr<floating_container_t> dynamic;
-     *  };
-     *
-     *  /**
-     * A node which represents a layer (Level 2) in the scenegraph.
+     * These nodes move together with the output's workspaces.
+     * These nodes are most commonly views.
      */
-    class layer_node_t : public inner_node_t
-    {
-      public:
-        /**
-         * Find the child node corresponding to the given output.
-         */
-        const std::shared_ptr<output_node_t>& node_for_output(wf::output_t *output);
-    };
+    std::shared_ptr<inner_node_t> dynamic;
+};
+
+/**
+ * A node which represents a layer (Level 2) in the scenegraph.
+ */
+class layer_node_t : public inner_node_t
+{
+  public:
+    layer_node_t();
+
+    /**
+     * Find the child node corresponding to the given output.
+     */
+    const std::shared_ptr<output_node_t>& node_for_output(wf::output_t* output);
+
+  private:
+    std::map<wf::output_t*, std::shared_ptr<output_node_t>> outputs;
+
+    // Called by output-layout when the outputs change
+    void handle_outputs_changed(wf::output_t* output, bool add);
+    friend class wf::output_layout_t;
+};
 
 /**
  * A list of all layers in the root node.
  */
-    enum class layer : size_t
-    {
-        BACKGROUND = 0,
-        BOTTOM     = 1,
-        WORKSPACE  = 2,
-        TOP        = 3,
-        UNMANAGED  = 4,
-        OVERLAY    = 5,
-        /** Not a real layer, but a placeholder for the number of layers. */
-        ALL_LAYERS,
-    };
-
-    class layer_node_t;
+enum class layer : size_t
+{
+    BACKGROUND = 0,
+    BOTTOM     = 1,
+    WORKSPACE  = 2,
+    TOP        = 3,
+    UNMANAGED  = 4,
+    OVERLAY    = 5,
+    /** Not a real layer, but a placeholder for the number of layers. */
+    ALL_LAYERS,
+};
 
 /**
  * The root (Level 1) node of the whole scenegraph.
  */
-    class root_node_t : public node_t
-    {
-      public:
-        const input_node_t& find_node_at(const wf::pointf_t& at) final;
+class root_node_t : public inner_node_t
+{
+  public:
+    root_node_t();
 
-        /**
-         * An ordered list of all layers' nodes.
-         */
-        std::shared_ptr<layer_node_t> layers[(size_t)layer::ALL_LAYERS];
-    };
+    /**
+     * An ordered list of all layers' nodes.
+     */
+    std::shared_ptr<layer_node_t> layers[(size_t)layer::ALL_LAYERS];
+};
 }
 }
